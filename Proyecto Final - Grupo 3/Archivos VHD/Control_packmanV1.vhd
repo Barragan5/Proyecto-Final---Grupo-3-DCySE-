@@ -51,12 +51,10 @@ architecture Behavioral of Control_packmanV1 is
                dout : out unsigned(32-1 downto 0)); 
     end component;
                           
-    signal f, c           : unsigned(5 downto 0);
-    signal SampClk1       : STD_LOGIC;
-    signal SampClk2       : STD_LOGIC;
-    signal SampClk_actual : STD_LOGIC;
-    signal Botones        : unsigned (3 downto 0);
-    
+    signal f, c          : unsigned(5 downto 0);
+    signal SampClk       : STD_LOGIC;
+    signal Botones       : unsigned (3 downto 0);
+    signal incremento    : natural :=2;
     -- Circuito
     signal  dir_map      : unsigned (5-1 downto 0) := f(4 downto 0); 
     signal dout_map      : unsigned(32-1 downto 0);
@@ -69,14 +67,8 @@ begin
                                port map(rst     => rst,
                                         enable  => '1',
                                         clk     => clk2,
-                                        fn_cont => SampClk1 );
-                                        
-    Sampling_clk2 : ContadorBCD generic map (temp  => (100e5)-1, -- 500 ms
-                                            Nbits => 22)
-                               port map(rst     => rst,
-                                        enable  => '1',
-                                        clk     => clk2,
-                                        fn_cont => SampClk2 );                                    
+                                        fn_cont => SampClk );
+                                 
                                         
     Mando : Mando_SNES port map ( clk           => clk2,
                                   rst           => rst,
@@ -93,9 +85,9 @@ begin
     process(clk2) -- Cambia el tiempo de muestreo del input en función de si el pacman está dentro o fuera de pista. Se traduce en cambiar la velocidad de movimiento
     begin
         if (dout_map(TO_INTEGER(c(4 downto 0)))='0') then
-            SampClk_actual <= SampClk2;   
+            incremento <= 1;   
         else
-            SampClk_actual <= SampClk1;
+            incremento <= 2;
         end if;                         
     end process;      
                                     
@@ -103,22 +95,22 @@ begin
     Contador_fc : process(Botones, rst)       -- Direcciones y reset
     begin
         if(rst='1')then                       -- Si hay un reset
-            f <= (others=>'0');               -- Se vuelve a la posición inicial
-            c <= (others=>'0');
-        elsif rising_edge(SampClk_actual) AND Botones /= "0000" then   -- Cuando hayan pasado 100 ms
+            f <= TO_UNSIGNED(7,6);               -- Se vuelve a la posición inicial
+            c <= TO_UNSIGNED(10,6);
+        elsif rising_edge(SampClk) AND Botones /= "0000" then   -- Cuando hayan pasado 100 ms
             -- IZQUIERDA -------------
             if(Botones = not("0100")) then
                 if(c = "000000") then
                     c <= Cmax;                                         -- En caso de desbordamiento por la izq, aparece en el margen derecho
                 else  
-                    c <= c - 1;  
+                    c <= c - incremento;  
                 end if;
             -- DERECHA ----------------                         
             elsif(Botones = not("1000")) then
                 if(c = Cmax) then
                     c <= (others =>'0');                              -- En caso de desbordamiento por la der, aparece en el margen izquierdo
                 else
-                    c <= c + 1; 
+                    c <= c + incremento; 
                 end if;  
             else
                 c <= c;    
@@ -129,14 +121,14 @@ begin
                 if(f = Fmax) then                                                                                   
                     f <=(others =>'0');                              -- En caso de desbordamiento por abajo, aparece en el margen superior  
                 else                                                                                              
-                    f <= f + 1;                                                                                     
+                    f <= f + incremento;                                                                                     
                 end if;                                                                                           
             -- ARRIBA -----------------                                                                                            
             elsif(Botones = not("0001")) then                                                                                   
                 if(f = "000000") then                                                                                      
                     f <= Fmax;                                      -- En caso de desbordamiento por arriba, aparece en el margen inferior 
                 else                                                                                              
-                    f <= f - 1;                                                                                     
+                    f <= f - incremento;                                                                                     
                 end if;
             else
                 f <= f;     
